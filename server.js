@@ -1,51 +1,46 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const fs = require("fs");
-const path = require("path");
-
 const app = express();
-const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, "profits.json");
 
-// Middleware
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Função para carregar dados
+const PROFITS_FILE = "./profits.json";
+
+// Função para carregar os lucros do arquivo JSON
 function loadProfits() {
-    if (fs.existsSync(DATA_FILE)) {
-        const data = fs.readFileSync(DATA_FILE, "utf8");
-        return JSON.parse(data);
+    if (fs.existsSync(PROFITS_FILE)) {
+        return JSON.parse(fs.readFileSync(PROFITS_FILE));
     }
     return {};
 }
 
-// Função para salvar dados
+// Função para salvar os lucros no arquivo JSON
 function saveProfits(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    fs.writeFileSync(PROFITS_FILE, JSON.stringify(data, null, 2));
 }
 
-// Endpoint para salvar lucro
+// Endpoint para salvar os lucros
 app.post("/api/profit", (req, res) => {
-    const { userId, planId, profit, startTime } = req.body;
+    const { userId, planId, profit } = req.body;
 
-    if (!userId || !planId || profit == null) {
-        return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
+    if (!userId || !planId) {
+        return res.status(400).json({ message: "userId e planId são obrigatórios" });
     }
 
     const profits = loadProfits();
 
+    // Atualiza ou cria os lucros para o usuário e plano
     if (!profits[userId]) {
         profits[userId] = {};
     }
-
-    profits[userId][planId] = { profit, startTime };
+    profits[userId][planId] = profit;
 
     saveProfits(profits);
 
-    res.json({ message: "Lucro salvo com sucesso", data: profits[userId][planId] });
+    res.json({ message: "Lucros salvos com sucesso", profits: profits[userId] });
 });
 
-// Endpoint para obter lucro
+// Endpoint para buscar lucros
 app.get("/api/profit", (req, res) => {
     const { userId, planId } = req.query;
 
@@ -54,15 +49,14 @@ app.get("/api/profit", (req, res) => {
     }
 
     const profits = loadProfits();
+    const userProfits = profits[userId] || {};
+    const profit = userProfits[planId] || 0;
 
-    if (profits[userId] && profits[userId][planId]) {
-        return res.json(profits[userId][planId]);
-    }
-
-    res.json({ profit: 0 }); // Retorna 0 se não encontrar o registro
+    res.json({ profit });
 });
 
-// Inicializa o servidor
+// Inicia o servidor
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
