@@ -1,27 +1,49 @@
+const express = require('express');
+const app = express();
+const port = 3000;
+
+// Dados de exemplo (em produção, você deve usar um banco de dados)
+let profitData = {};
+
+// Middleware para permitir requisições CORS
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
+
+// Middleware para parsear JSON
+app.use(express.json());
+
+// Endpoint para obter o lucro
 app.get('/api/profit', (req, res) => {
-    const planId = req.query.planId;  // Obtém o planId da URL
+    const planId = req.query.planId;
+
     if (!planId) {
         return res.status(400).send('O planId é necessário.');
     }
 
-    // Aqui, você deve adicionar a lógica para buscar o lucro associado ao planId
-    const profit = getProfitForPlan(planId);  // Exemplo de função para buscar o lucro do plano
+    // Verifique se existe lucro salvo para o planId
+    const profit = profitData[planId] || 0;
 
-    if (profit === undefined) {
-        return res.status(404).send('Plano não encontrado.');
-    }
-
-    res.json({ profit: profit.toFixed(2) });  // Retorna o lucro com duas casas decimais
+    res.json({ profit: profit.toFixed(2) });
 });
 
-// Função de exemplo para obter o lucro de um plano específico
-function getProfitForPlan(planId) {
-    // Aqui você pode buscar o lucro no banco de dados ou memória
-    // Exemplo simples de lucro fixo para um plano
-    const profits = {
-        "plan1": 100.00,
-        "plan2": 200.00
-    };
+// Endpoint para salvar o lucro
+app.post('/api/profit', (req, res) => {
+    const { planId, profit } = req.body;
 
-    return profits[planId];
-}
+    if (!planId || profit === undefined) {
+        return res.status(400).send('PlanId e Profit são necessários.');
+    }
+
+    // Salva o lucro para o planId
+    profitData[planId] = profit;
+
+    res.status(200).send('Lucro salvo com sucesso!');
+});
+
+// Inicia o servidor
+app.listen(port, () => {
+    console.log(`Servidor rodando na porta ${port}`);
+});
