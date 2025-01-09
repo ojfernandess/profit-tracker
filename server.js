@@ -1,49 +1,46 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-const port = 3000;
+const bodyParser = require("body-parser");
+app.use(bodyParser.json());
 
-// Dados de exemplo (em produção, você deve usar um banco de dados)
-let profitData = {};
+let profits = {};  // Aqui vamos armazenar os lucros por `userId` e `planId` para fins de exemplo
 
-// Middleware para permitir requisições CORS
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
+// Rota para salvar o lucro
+app.post("/api/profit", (req, res) => {
+    const { userId, planId, profit, startTime } = req.body;
+
+    if (!userId || !planId || profit === undefined) {
+        return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
+    }
+
+    // Salva o lucro no "banco de dados" (usando um objeto simples aqui, mas você pode usar um banco real)
+    if (!profits[userId]) {
+        profits[userId] = {};
+    }
+
+    profits[userId][planId] = { profit, startTime };
+
+    res.json({ message: "Lucro salvo com sucesso!" });
 });
 
-// Middleware para parsear JSON
-app.use(express.json());
-
-// Endpoint para obter o lucro
-app.get('/api/profit', (req, res) => {
+// Rota para recuperar os lucros
+app.get("/api/profit", (req, res) => {
+    const userId = req.query.userId;
     const planId = req.query.planId;
 
-    if (!planId) {
-        return res.status(400).send('O planId é necessário.');
+    if (!userId || !planId) {
+        return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
     }
 
-    // Verifique se existe lucro salvo para o planId
-    const profit = profitData[planId] || 0;
-
-    res.json({ profit: profit.toFixed(2) });
-});
-
-// Endpoint para salvar o lucro
-app.post('/api/profit', (req, res) => {
-    const { planId, profit } = req.body;
-
-    if (!planId || profit === undefined) {
-        return res.status(400).send('PlanId e Profit são necessários.');
+    // Recupera o lucro armazenado
+    const userProfit = profits[userId] && profits[userId][planId];
+    if (userProfit) {
+        return res.json(userProfit);
+    } else {
+        return res.json({ profit: 0 });
     }
-
-    // Salva o lucro para o planId
-    profitData[planId] = profit;
-
-    res.status(200).send('Lucro salvo com sucesso!');
 });
 
-// Inicia o servidor
-app.listen(port, () => {
-    console.log(`Servidor rodando na porta ${port}`);
+app.listen(3000, () => {
+    console.log("Servidor rodando na porta 3000");
 });
