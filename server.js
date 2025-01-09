@@ -1,43 +1,61 @@
 const express = require("express");
-const app = express();
+const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+
+const app = express();
 app.use(bodyParser.json());
 
-let profits = {};  // Aqui vamos armazenar os lucros por `userId` e `planId` para fins de exemplo
+// Conecte ao banco de dados MongoDB
+mongoose.connect("mongodb://localhost:27017/profit-tracker", { useNewUrlParser: true, useUnifiedTopology: true });
 
-// Rota para salvar o lucro
-app.post("/api/profit", (req, res) => {
+// Defina o modelo para armazenar os lucros
+const profitSchema = new mongoose.Schema({
+    userId: String,
+    planId: String,
+    profit: Number,
+    startTime: Number
+});
+
+const Profit = mongoose.model("Profit", profitSchema);
+
+// Rota para salvar ou atualizar o lucro
+app.post("/api/profit", async (req, res) => {
     const { userId, planId, profit, startTime } = req.body;
 
     if (!userId || !planId || profit === undefined) {
         return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
     }
 
-    // Salva o lucro no "banco de dados" (usando um objeto simples aqui, mas você pode usar um banco real)
-    if (!profits[userId]) {
-        profits[userId] = {};
+    try {
+        // Atualiza ou cria um novo registro
+        const result = await Profit.findOneAndUpdate(
+            { userId, planId },
+            { profit, startTime },
+            { upsert: true, new: true }
+        );
+        res.json({ message: "Lucro salvo com sucesso!", data: result });
+    } catch (error) {
+        res.status(500).json({ message: "Erro ao salvar lucro", error });
     }
-
-    profits[userId][planId] = { profit, startTime };
-
-    res.json({ message: "Lucro salvo com sucesso!" });
 });
 
 // Rota para recuperar os lucros
-app.get("/api/profit", (req, res) => {
-    const userId = req.query.userId;
-    const planId = req.query.planId;
+app.get("/api/profit", async (req, res) => {
+    const { userId, planId } = req.query;
 
     if (!userId || !planId) {
         return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
     }
 
-    // Recupera o lucro armazenado
-    const userProfit = profits[userId] && profits[userId][planId];
-    if (userProfit) {
-        return res.json(userProfit);
-    } else {
-        return res.json({ profit: 0 });
+    try {
+        const result = await Profit.findOne({ userId, planId });
+        if (result) {
+            res.json(result);
+        } else {
+            res.json({ profit: 0 });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Erro ao recuperar lucro", error });
     }
 });
 
