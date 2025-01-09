@@ -1,64 +1,68 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, "profits.json");
+
+// Middleware
 app.use(bodyParser.json());
 
-// Conecte ao banco de dados MongoDB
-mongoose.connect("mongodb://localhost:27017/profit-tracker", { useNewUrlParser: true, useUnifiedTopology: true });
+// Função para carregar dados
+function loadProfits() {
+    if (fs.existsSync(DATA_FILE)) {
+        const data = fs.readFileSync(DATA_FILE, "utf8");
+        return JSON.parse(data);
+    }
+    return {};
+}
 
-// Defina o modelo para armazenar os lucros
-const profitSchema = new mongoose.Schema({
-    userId: String,
-    planId: String,
-    profit: Number,
-    startTime: Number
-});
+// Função para salvar dados
+function saveProfits(data) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
-const Profit = mongoose.model("Profit", profitSchema);
-
-// Rota para salvar ou atualizar o lucro
-app.post("/api/profit", async (req, res) => {
+// Endpoint para salvar lucro
+app.post("/api/profit", (req, res) => {
     const { userId, planId, profit, startTime } = req.body;
 
-    if (!userId || !planId || profit === undefined) {
+    if (!userId || !planId || profit == null) {
         return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
     }
 
-    try {
-        // Atualiza ou cria um novo registro
-        const result = await Profit.findOneAndUpdate(
-            { userId, planId },
-            { profit, startTime },
-            { upsert: true, new: true }
-        );
-        res.json({ message: "Lucro salvo com sucesso!", data: result });
-    } catch (error) {
-        res.status(500).json({ message: "Erro ao salvar lucro", error });
+    const profits = loadProfits();
+
+    if (!profits[userId]) {
+        profits[userId] = {};
     }
+
+    profits[userId][planId] = { profit, startTime };
+
+    saveProfits(profits);
+
+    res.json({ message: "Lucro salvo com sucesso", data: profits[userId][planId] });
 });
 
-// Rota para recuperar os lucros
-app.get("/api/profit", async (req, res) => {
+// Endpoint para obter lucro
+app.get("/api/profit", (req, res) => {
     const { userId, planId } = req.query;
 
     if (!userId || !planId) {
-        return res.status(400).json({ message: "Faltando parâmetros obrigatórios" });
+        return res.status(400).json({ message: "userId e planId são obrigatórios" });
     }
 
-    try {
-        const result = await Profit.findOne({ userId, planId });
-        if (result) {
-            res.json(result);
-        } else {
-            res.json({ profit: 0 });
-        }
-    } catch (error) {
-        res.status(500).json({ message: "Erro ao recuperar lucro", error });
+    const profits = loadProfits();
+
+    if (profits[userId] && profits[userId][planId]) {
+        return res.json(profits[userId][planId]);
     }
+
+    res.json({ profit: 0 }); // Retorna 0 se não encontrar o registro
 });
 
-app.listen(3000, () => {
-    console.log("Servidor rodando na porta 3000");
+// Inicializa o servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
