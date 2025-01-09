@@ -23,8 +23,8 @@ function saveProfits(data) {
 app.post("/api/profit", (req, res) => {
     const { userId, planId, profit } = req.body;
 
-    if (!userId || !planId) {
-        return res.status(400).json({ message: "userId e planId são obrigatórios" });
+    if (!userId || !planId || typeof profit !== 'number') {
+        return res.status(400).json({ message: "userId, planId e profit são obrigatórios" });
     }
 
     const profits = loadProfits();
