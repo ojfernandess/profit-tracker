@@ -1,29 +1,21 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const fs = require("fs");
+const bodyParser = require("body-parser");
+
 const app = express();
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = "./profits.json";
 
-const PORT = 5000;
-const DATA_FILE = "profits.json";
-
-// Middleware para parsear JSON
+// Middleware
 app.use(bodyParser.json());
 
-// Função para carregar dados do arquivo
-function loadData() {
-    if (fs.existsSync(DATA_FILE)) {
-        const data = fs.readFileSync(DATA_FILE, "utf8");
-        return JSON.parse(data);
-    }
-    return {}; // Retorna um objeto vazio se o arquivo não existir
+// Carregar dados do arquivo JSON
+let data = {};
+if (fs.existsSync(DATA_FILE)) {
+    data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 }
 
-// Função para salvar dados no arquivo
-function saveData(data) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-}
-
-// Rota POST para salvar lucros
+// Endpoint para salvar dados (POST)
 app.post("/api/profit", (req, res) => {
     const { userId, planId, profit, startTime } = req.body;
 
@@ -31,22 +23,17 @@ app.post("/api/profit", (req, res) => {
         return res.status(400).json({ message: "userId e planId são obrigatórios" });
     }
 
-    const data = loadData();
+    const key = `${userId}-${planId}`;
+    data[key] = { profit, startTime };
 
-    // Verifica se o usuário existe
-    if (!data[userId]) {
-        data[userId] = {};
-    }
+    // Salvar os dados no arquivo
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+    console.log(`Dados salvos para ${key}:`, data[key]);
 
-    // Salva os lucros do plano
-    data[userId][planId] = { profit, startTime };
-
-    saveData(data);
-
-    res.status(200).json({ message: "Dados salvos com sucesso" });
+    res.json({ message: "Dados salvos com sucesso" });
 });
 
-// Rota GET para recuperar lucros
+// **NOVO** Endpoint para recuperar dados (GET)
 app.get("/api/profit", (req, res) => {
     const { userId, planId } = req.query;
 
@@ -54,16 +41,17 @@ app.get("/api/profit", (req, res) => {
         return res.status(400).json({ message: "userId e planId são obrigatórios" });
     }
 
-    const data = loadData();
+    const key = `${userId}-${planId}`;
+    const profitData = data[key];
 
-    // Retorna os lucros do usuário e plano especificado
-    if (data[userId] && data[userId][planId]) {
-        return res.status(200).json(data[userId][planId]);
+    if (!profitData) {
+        return res.status(404).json({ message: "Dados não encontrados para este usuário e plano" });
     }
 
-    res.status(404).json({ message: "Dados não encontrados" });
+    res.json(profitData);
 });
 
+// Iniciar o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
